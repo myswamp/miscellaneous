@@ -1,30 +1,70 @@
 package com.myswamp.elevator;
 
 
+import java.util.Comparator;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 
 enum State {
-    IDLE, UP, DOWN
+    IDLE, UP, DOWN, STOPPED
 }
 
 enum Direction {
     UPWARD, DOWNWARD
 }
 public class Elevator {
-    private State state = State.IDLE;
+
+
+    private State state = State.STOPPED;
     private int bottomFloor;
     private int topFloor;
-    private int currentFloor;
-    private BlockingQueue<Command> upwardQueue = new PriorityBlockingQueue<>(topFloor - bottomFloor, (c1, c2) -> {
-        return (c1.getToFloor() - c1.getAtFloor()) - (c2.getToFloor() - c2.getAtFloor());
-    });
-    private BlockingQueue<Command> downwardQueue = new PriorityBlockingQueue<>(topFloor - bottomFloor, (c1, c2) -> {
-        return (c1.getAtFloor() - c1.getToFloor()) - (c2.getAtFloor() - c2.getToFloor());
-    });
+    private int currentFloor = 0;
+    private BlockingQueue<Command> upwardQueue;
+    private BlockingQueue<Command> downwardQueue;
 
+    Elevator(int bottomFloor, int topFloor) {
+        this.bottomFloor = bottomFloor;
+        this.topFloor = topFloor;
+        this.upwardQueue = new PriorityBlockingQueue<>(topFloor - bottomFloor,
+                Comparator.comparingInt(c -> (c.getToFloor() - c.getAtFloor())));
+        this.downwardQueue = new PriorityBlockingQueue<>(topFloor - bottomFloor,
+                Comparator.comparingInt(c -> (c.getAtFloor() - c.getToFloor())));
+    }
 
-    public void onReceiveCommand(Command command) {
+    public State getState() {
+        return state;
+    }
+
+    public int getBottomFloor() {
+        return bottomFloor;
+    }
+
+    public int getTopFloor() {
+        return topFloor;
+    }
+
+    public int getCurrentFloor() {
+        return currentFloor;
+    }
+
+    public void start() throws InterruptedException {
+        assert this.state == State.STOPPED;
+        this.state = State.IDLE;
+
+        while (true) {
+            processCommands();
+
+            if (this.state == State.STOPPED)
+                break;
+        }
+    }
+
+    public void stop() {
+        assert this.currentFloor == 0;
+        this.state = State.STOPPED;
+    }
+
+    public void issueCommand(Command command) {
         if(command instanceof OpenDoorCommand openDoorCommand) {
             onReceiveOpenDoorCommand(openDoorCommand);
         } else if(command instanceof MoveCommand moveCommand) {
@@ -71,8 +111,8 @@ public class Elevator {
     }
 
     private void processDownwardsCommands() throws InterruptedException {
-        state = State.DOWN;
         while (!downwardQueue.isEmpty()) {
+            state = State.DOWN;
             Command command = downwardQueue.poll();
             int toFloor = command.getToFloor();
             while(currentFloor != toFloor) {
@@ -90,8 +130,8 @@ public class Elevator {
     }
 
     private void processUpwardCommands() throws InterruptedException {
-        state = State.UP;
         while (!upwardQueue.isEmpty()) {
+            state = State.UP;
             Command command = upwardQueue.poll();
             int toFloor = command.getToFloor();
             while(currentFloor != toFloor) {
@@ -125,8 +165,9 @@ abstract class Command {
 
 class OpenDoorCommand extends Command {
     private Direction direction;
-    OpenDoorCommand(int atFloor, Direction direction) {
+    OpenDoorCommand(int atFloor, int toFloor, Direction direction) {
         this.atFloor = atFloor;
+        this.toFloor = toFloor;
         this.direction = direction;
     }
 

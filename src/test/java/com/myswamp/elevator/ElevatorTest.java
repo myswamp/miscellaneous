@@ -34,4 +34,11 @@ class ElevatorTest {
         Thread.sleep(1100);
         assertEquals(10, elevator.getCurrentFloor());
     }
+
+    @Test
+    public void testGoDown() throws InterruptedException {
+        elevator.issueCommand(new OpenDoorCommand(elevator.getCurrentFloor(), -2, Direction.DOWNWARD));
+        Thread.sleep(300);
+        assertEquals(-2, elevator.getCurrentFloor());
+    }
 }
